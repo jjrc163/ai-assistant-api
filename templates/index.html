@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Assistant API</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>AI Assistant</h1>
+      <p class="subtitle">
+        A small REST API + web UI wrapping an OpenAI-compatible LLM.
+        {% if mock_mode %}<span class="badge">mock mode</span>{% endif %}
+      </p>
+    </header>
+
+    <section id="chat" class="chat" aria-live="polite"></section>
+
+    <form id="form" class="composer">
+      <input id="input" type="text" placeholder="Ask something…" autocomplete="off" required>
+      <button type="submit">Send</button>
+    </form>
+  </main>
+
+  <script>
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = [];
+
+    function addBubble(role, text) {
+      const div = document.createElement('div');
+      div.className = 'bubble ' + role;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      addBubble('user', text);
+      messages.push({ role: 'user', content: text });
+
+      const pending = document.createElement('div');
+      pending.className = 'bubble assistant pending';
+      pending.textContent = '…';
+      chat.appendChild(pending);
+      chat.scrollTop = chat.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages }),
+        });
+        const data = await res.json();
+        pending.remove();
+        if (!res.ok) {
+          addBubble('error', data.error || 'Something went wrong.');
+          return;
+        }
+        addBubble('assistant', data.reply);
+        messages.push({ role: 'assistant', content: data.reply });
+      } catch (err) {
+        pending.remove();
+        addBubble('error', 'Network error: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
